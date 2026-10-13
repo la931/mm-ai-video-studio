@@ -21,9 +21,6 @@ allow_headers=[""],
 )
 
 MAX_FILE_SIZE = 100 * 1024 * 1024
-
-Use a model available to your Gemini API key.
-
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 @app.get("/")
@@ -93,21 +90,20 @@ try:
 
     prompt = """
 
-You are a professional Chinese drama recap narrator.
+သင်သည် တရုတ်ဇာတ်လမ်းတိုများကို မြန်မာလို ဇာတ်ကြောင်းပြန်လည်
+ပြောပြပေးသော ကျွမ်းကျင်သူတစ်ဦးဖြစ်သည်။
 
-Analyze the uploaded video and write an engaging Burmese narration
-based only on events and details supported by the video.
+ပေးပို့ထားသော ဗီဒီယိုကို ဆန်းစစ်ပြီး အောက်ပါအချက်များအတိုင်း
+သဘာဝကျသော မြန်မာဘာသာစကားဖြင့် ဇာတ်ကြောင်းရေးပေးပါ။
 
-Include:
+၁။ အဓိကဇာတ်ကောင်များနှင့် ၎င်းတို့၏ အခန်းကဏ္ဍ။
+၂။ ဇာတ်ကွက်များနှင့် လှုပ်ရှားမှုများကို အစဉ်လိုက်ဖော်ပြရန်။
+၃။ အဓိကပဋိပက္ခများနှင့် စိတ်ခံစားမှုများ။
+၄။ အသံဖြင့် ဖတ်ပြရန် သင့်လျော်သော ဇာတ်ကြောင်းတစ်ခု။
+၅။ ဗီဒီယိုတွင် မပါဝင်သော အဖြစ်အပျက်များကို မဖန်တီးရန်။
 
-1. Main characters and their apparent roles.
-2. Important scenes and actions in chronological order.
-3. Main conflicts and emotional moments.
-4. A coherent Burmese narration suitable for voice-over.
-5. Do not invent events or character relationships.
-
-If any detail is unclear, say so rather than guessing.
-Return the narration in natural Burmese.
+မသေချာသော အချက်အလက်များကို ခန့်မှန်းမရေးပါနှင့်။
+မြန်မာဘာသာဖြင့်သာ ဖြေဆိုပါ။
 """
 
     response = client.models.generate_content(
