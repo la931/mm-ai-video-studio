@@ -1,5 +1,4 @@
 import os
-import time
 import tempfile
 from pathlib import Path
 
@@ -8,23 +7,31 @@ from fastapi.middleware.cors import CORSMiddleware
 from google import genai
 from google.genai import types
 
-app = FastAPI(title="MM AI Video Studio")
+app = FastAPI(
+title="MM AI Video Studio",
+version="1.1.0",
+description="AI-powered Myanmar video storytelling API",
+)
 
 app.add_middleware(
 CORSMiddleware,
 allow_origins=[""],
-allow_methods=["GET", "POST"],
+allow_methods=["GET", "POST", "OPTIONS"],
 allow_headers=[""],
 )
 
 MAX_FILE_SIZE = 100 * 1024 * 1024
+
+Use a model available to your Gemini API key.
+
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 @app.get("/")
 async def home():
 return {
 "app": "MM AI Video Studio",
 "status": "online",
-"message": "Backend is running"
+"message": "Backend is running",
 }
 
 @app.get("/health")
@@ -33,31 +40,29 @@ return {"status": "healthy"}
 
 @app.post("/analyze")
 async def analyze_video(video: UploadFile = File(...)):
-
-api_key = os.environ.get("GEMINI_API_KEY")
+api_key = os.getenv("GEMINI_API_KEY")
 
 if not api_key:
     raise HTTPException(
         status_code=500,
-        detail="GEMINI_API_KEY is not configured"
+        detail="GEMINI_API_KEY is not configured",
     )
 
 if not video.content_type or not video.content_type.startswith("video/"):
     raise HTTPException(
         status_code=400,
-        detail="Please upload a video file"
+        detail="Please upload a valid video file",
     )
 
 suffix = Path(video.filename or "video.mp4").suffix or ".mp4"
 temp_path = None
-uploaded_file = None
 
 try:
     total_size = 0
 
     with tempfile.NamedTemporaryFile(
         suffix=suffix,
-        delete=False
+        delete=False,
     ) as temp:
         temp_path = temp.name
 
@@ -72,7 +77,7 @@ try:
             if total_size > MAX_FILE_SIZE:
                 raise HTTPException(
                     status_code=413,
-                    detail="Video must be 100 MB or smaller"
+                    detail="Video must be 100 MB or smaller",
                 )
 
             temp.write(chunk)
@@ -82,52 +87,32 @@ try:
     uploaded_file = client.files.upload(
         file=temp_path,
         config=types.UploadFileConfig(
-            mime_type=video.content_type
-        )
+            mime_type=video.content_type,
+        ),
     )
-
-    # Wait until Gemini finishes processing the uploaded video.
-    deadline = time.time() + 240
-
-    while uploaded_file.state and uploaded_file.state.name == "PROCESSING":
-        if time.time() > deadline:
-            raise HTTPException(
-                status_code=504,
-                detail="Video processing timed out. Please try a shorter video."
-            )
-
-        time.sleep(3)
-        uploaded_file = client.files.get(name=uploaded_file.name)
-
-    if not uploaded_file.state or uploaded_file.state.name != "ACTIVE":
-        raise HTTPException(
-            status_code=422,
-            detail="Gemini could not process this video"
-        )
 
     prompt = """
 
 You are a professional Chinese drama recap narrator.
 
-Analyze the uploaded video and explain its actual story in Burmese.
-
-Write in natural, engaging Burmese suitable for voice narration.
+Analyze the uploaded video and write an engaging Burmese narration
+based only on events and details supported by the video.
 
 Include:
 
-1. The main characters and their apparent roles.
-2. The important scenes and actions in chronological order.
-3. The main conflict and emotional moments.
-4. A coherent Burmese narration based on what is actually shown.
-5. Do not invent events that are not supported by the video.
+1. Main characters and their apparent roles.
+2. Important scenes and actions in chronological order.
+3. Main conflicts and emotional moments.
+4. A coherent Burmese narration suitable for voice-over.
+5. Do not invent events or character relationships.
 
-If some details are unclear, say so instead of guessing.
-Return the narration in Burmese.
+If any detail is unclear, say so rather than guessing.
+Return the narration in natural Burmese.
 """
 
     response = client.models.generate_content(
-        model="gemini-3.8-flash",
-        contents=[uploaded_file, prompt]
+        model=GEMINI_MODEL,
+        contents=[uploaded_file, prompt],
     )
 
     narration = response.text or ""
@@ -135,25 +120,28 @@ Return the narration in Burmese.
     if not narration.strip():
         raise HTTPException(
             status_code=502,
-            detail="AI did not return a narration"
+            detail="The AI returned an empty narration",
         )
 
     return {
         "success": True,
         "filename": video.filename,
         "narration": narration,
-        "message": "AI video analysis completed"
+        "message": "Video analysis completed",
     }
 
 except HTTPException:
     raise
 
 except Exception as exc:
-    print("Video analysis error:", repr(exc))
+    print(f"Video analysis error: {exc!r}")
 
     raise HTTPException(
         status_code=500,
-        detail="AI analysis failed. Check the Render logs and Gemini API configuration."
+        detail=(
+            "AI analysis failed. Check the Render logs, "
+            "Gemini API key, model availability, and API quota."
+        ),
     )
 
 finally:
